@@ -3,113 +3,221 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>YouTube Inline Search</title>
-
+  <title>Featured YouTube Video</title>
   <style>
+    :root {
+      color-scheme: light;
+      --bg: #0f172a;
+      --panel: #111827;
+      --card: #1f2937;
+      --text: #f8fafc;
+      --muted: #cbd5e1;
+      --accent: #ff0000;
+      --border: #334155;
+      --input-bg: #0b1220;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
     body {
+      margin: 0;
       font-family: Arial, sans-serif;
-      background: #f5f5f5;
-      padding: 20px;
+      background: radial-gradient(circle at top, #1e293b 0%, #0b1120 60%);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 28px 18px;
     }
 
-    .search-box {
+    .container {
+      max-width: 980px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 2rem;
+    }
+
+    p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .panel {
+      margin-top: 22px;
+      padding: 18px;
+      background: rgba(17, 24, 39, 0.85);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      backdrop-filter: blur(2px);
+    }
+
+    .input-row {
       display: flex;
-      max-width: 600px;
-      margin-bottom: 20px;
+      gap: 12px;
+      flex-wrap: wrap;
     }
 
-    .search-box input {
+    input[type="url"] {
       flex: 1;
+      min-width: 240px;
       padding: 12px;
       font-size: 16px;
-      border-radius: 8px 0 0 8px;
-      border: 1px solid #ccc;
-    }
-
-    .search-box button {
-      padding: 12px 20px;
-      font-size: 16px;
-      background: #ff0000;
-      color: white;
-      border: none;
-      border-radius: 0 8px 8px 0;
-      cursor: pointer;
-    }
-
-    .iframe-wrapper {
-      width: 100%;
-      max-width: 900px;
-      height: 60vh;
-      margin-bottom: 20px;
       border-radius: 10px;
-      overflow: hidden;
-      border: 2px solid #ddd;
+      border: 1px solid var(--border);
+      color: var(--text);
+      background: var(--input-bg);
     }
 
-    #searchFrame {
+    button {
+      padding: 12px 18px;
+      font-size: 16px;
+      font-weight: 700;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      background: var(--accent);
+      color: #fff;
+    }
+
+    button:hover {
+      filter: brightness(1.05);
+    }
+
+    .message {
+      margin-top: 10px;
+      min-height: 20px;
+      color: #fda4af;
+    }
+
+    .video-wrap {
+      margin-top: 20px;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+      background: #000;
+    }
+
+    iframe {
       width: 100%;
       height: 100%;
-      border: none;
+      border: 0;
     }
 
-    #ytFrame {
-      width: 100%;
-      max-width: 900px;
-      aspect-ratio: 16 / 9;
-      border: none;
-      border-radius: 12px;
+    .back-link {
+      display: inline-block;
+      margin-top: 16px;
+      color: #93c5fd;
+      text-decoration: none;
+    }
+
+    .back-link:hover {
+      text-decoration: underline;
     }
   </style>
+</head>
+<body>
+  <main class="container">
+    <h1>Featured Video</h1>
+    <p>Default video: https://youtu.be/VHn1Awui7EY</p>
+
+    <section class="panel">
+      <div class="input-row">
+        <input id="ytUrl" type="url" placeholder="https://youtu.be/VHn1Awui7EY" />
+        <button id="loadBtn" type="button">Embed Video</button>
+      </div>
+      <div id="message" class="message" aria-live="polite"></div>
+
+      <div class="video-wrap">
+        <iframe
+          id="videoFrame"
+          src="https://www.youtube.com/embed/VHn1Awui7EY"
+          title="YouTube embedded player"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          referrerpolicy="strict-origin-when-cross-origin"
+          allowfullscreen>
+        </iframe>
+      </div>
+    </section>
+
+    
+  </main>
 
   <script>
-    function searchYouTube() {
-      const q = document.getElementById("searchInput").value.trim();
-      if (!q) return;
+    const urlInput = document.getElementById('ytUrl');
+    const loadBtn = document.getElementById('loadBtn');
+    const frame = document.getElementById('videoFrame');
+    const message = document.getElementById('message');
 
-      const url = "https://www.youtube.com/results?search_query=" + encodeURIComponent(q);
-      document.getElementById("searchFrame").src = url;
+    function extractVideoId(value) {
+      if (!value) return null;
+      const raw = value.trim();
+
+      if (/^[a-zA-Z0-9_-]{11}$/.test(raw)) {
+        return raw;
+      }
+
+      let parsed;
+      try {
+        parsed = new URL(raw);
+      } catch {
+        return null;
+      }
+
+      const host = parsed.hostname.replace(/^www\./, '');
+
+      if (host === 'youtu.be') {
+        const id = parsed.pathname.slice(1).split('/')[0];
+        return /^[a-zA-Z0-9_-]{11}$/.test(id) ? id : null;
+      }
+
+      if (host === 'youtube.com' || host === 'm.youtube.com') {
+        const watchId = parsed.searchParams.get('v');
+        if (watchId && /^[a-zA-Z0-9_-]{11}$/.test(watchId)) {
+          return watchId;
+        }
+
+        const segments = parsed.pathname.split('/').filter(Boolean);
+        const embedIndex = segments.indexOf('embed');
+        if (embedIndex !== -1 && segments[embedIndex + 1]) {
+          const embedId = segments[embedIndex + 1];
+          return /^[a-zA-Z0-9_-]{11}$/.test(embedId) ? embedId : null;
+        }
+
+        const shortsIndex = segments.indexOf('shorts');
+        if (shortsIndex !== -1 && segments[shortsIndex + 1]) {
+          const shortsId = segments[shortsIndex + 1];
+          return /^[a-zA-Z0-9_-]{11}$/.test(shortsId) ? shortsId : null;
+        }
+      }
+
+      return null;
     }
 
-    // Watch for when a video is clicked inside the iframe
-    setInterval(() => {
-      const frame = document.getElementById("searchFrame");
+    function embedVideo() {
+      const videoId = extractVideoId(urlInput.value);
 
-      try {
-        const url = frame.contentWindow.location.href;
-
-        if (url.includes("watch?v=")) {
-          const videoId = url.split("watch?v=")[1].split("&")[0];
-          document.getElementById("ytFrame").src =
-            "https://www.youtube.com/embed/" + videoId;
-
-          window.scrollTo({
-            top: document.getElementById("ytFrame").offsetTop - 20,
-            behavior: "smooth"
-          });
-        }
-      } catch (e) {
-        // cross-origin until click happens — safe to ignore
+      if (!videoId) {
+        message.textContent = 'Please paste a valid YouTube link.';
+        return;
       }
-    }, 800);
+
+      frame.src = 'https://www.youtube.com/embed/' + videoId;
+      message.textContent = '';
+    }
+
+    loadBtn.addEventListener('click', embedVideo);
+    urlInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        embedVideo();
+      }
+    });
   </script>
-</head>
-
-<body>
-
-  <div class="search-box">
-    <input id="searchInput" type="text" placeholder="Search YouTube…">
-    <button onclick="searchYouTube()">Search</button>
-  </div>
-
-  <div class="iframe-wrapper">
-    <iframe id="searchFrame"></iframe>
-  </div>
-
-  <iframe
-    id="ytFrame"
-    src="https://www.youtube.com/embed/a9u2yZvsqHA"
-    allowfullscreen>
-  </iframe>
-
 </body>
 </html>
